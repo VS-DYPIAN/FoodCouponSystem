@@ -4,6 +4,7 @@ import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { db } from "./db";
 import { users } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
@@ -32,6 +33,14 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Employee routes
+  app.get("/api/vendors", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.sendStatus(403);
+    }
+    const vendors = await db.select().from(users).where(eq(users.role, "vendor"));
+    res.json(vendors);
+  });
+
   app.post("/api/employee/pay", async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== "employee") {
       return res.sendStatus(403);
