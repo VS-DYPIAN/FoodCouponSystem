@@ -7,6 +7,14 @@ export function registerRoutes(app: Express): Server {
   setupAuth(app);
 
   // Admin routes
+  app.get("/api/users", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") {
+      return res.sendStatus(403);
+    }
+    const users = await db.select().from(users); // Assumed db and users are available
+    res.json(users);
+  });
+
   app.post("/api/admin/wallet", async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== "admin") {
       return res.sendStatus(403);
