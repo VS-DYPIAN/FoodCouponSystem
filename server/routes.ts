@@ -1,10 +1,11 @@
-import type { Express } from "express";
 import { createServer, type Server } from "http";
+import type { Express } from "express";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { db } from "./db";
 import { users, transactions } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import { sendNotification } from "./websocket";
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
@@ -26,6 +27,15 @@ export function registerRoutes(app: Express): Server {
     const { userId, amount } = req.body;
     try {
       const user = await storage.updateUserWallet(userId, parseFloat(amount));
+
+      // Send notification to user about wallet update
+      sendNotification({
+        type: "wallet_update",
+        message: `Your wallet has been updated by ${amount}`,
+        timestamp: new Date().toISOString(),
+        recipientId: userId,
+      });
+
       res.json(user);
     } catch (error) {
       res.status(400).json({ message: (error as Error).message });
@@ -56,6 +66,22 @@ export function registerRoutes(app: Express): Server {
         timestamp: new Date(),
         status: "completed",
       });
+
+      // Send notifications to both employee and vendor
+      sendNotification({
+        type: "transaction",
+        message: `Payment of $${amount} sent to vendor`,
+        timestamp: transaction.timestamp.toISOString(),
+        recipientId: req.user.id,
+      });
+
+      sendNotification({
+        type: "transaction",
+        message: `Received payment of $${amount} from ${req.user.username}`,
+        timestamp: transaction.timestamp.toISOString(),
+        recipientId: vendorId,
+      });
+
       res.json(transaction);
     } catch (error) {
       res.status(400).json({ message: (error as Error).message });
