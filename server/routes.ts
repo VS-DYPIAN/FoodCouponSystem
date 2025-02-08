@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { db } from "./db";
-import { users } from "@shared/schema";
+import { users, transactions } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 export function registerRoutes(app: Express): Server {
@@ -75,8 +75,20 @@ export function registerRoutes(app: Express): Server {
     if (!req.isAuthenticated() || req.user.role !== "vendor") {
       return res.sendStatus(403);
     }
-    const transactions = await storage.getTransactionsByVendor(req.user.id);
-    res.json(transactions);
+    const vendorTransactions = await db
+      .select({
+        id: transactions.id,
+        amount: transactions.amount,
+        timestamp: transactions.timestamp,
+        status: transactions.status,
+        employeeId: transactions.employeeId,
+        employeeName: users.username,
+      })
+      .from(transactions)
+      .innerJoin(users, eq(transactions.employeeId, users.id))
+      .where(eq(transactions.vendorId, req.user.id));
+
+    res.json(vendorTransactions);
   });
 
   const httpServer = createServer(app);

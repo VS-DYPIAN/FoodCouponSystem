@@ -6,10 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { format } from "date-fns";
 import { CreditCard, ReceiptText } from "lucide-react";
 
+type TransactionWithEmployee = Transaction & {
+  employeeName: string;
+};
+
 export default function VendorDashboard() {
   const { user, logoutMutation } = useAuth();
 
-  const { data: transactions } = useQuery<Transaction[]>({
+  const { data: transactions } = useQuery<TransactionWithEmployee[]>({
     queryKey: ["/api/vendor/transactions"],
     queryFn: async () => {
       const res = await fetch("/api/vendor/transactions");
@@ -84,6 +88,9 @@ export default function VendorDashboard() {
                   <div>
                     <p className="font-medium">
                       Amount: ${transaction.amount}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      From: {transaction.employeeName}
                     </p>
                     <p className="text-sm text-muted-foreground">
                       {format(
