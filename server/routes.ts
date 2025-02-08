@@ -2,6 +2,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
+import { db } from "./db";
+import { users } from "@shared/schema";
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
@@ -11,8 +13,8 @@ export function registerRoutes(app: Express): Server {
     if (!req.isAuthenticated() || req.user.role !== "admin") {
       return res.sendStatus(403);
     }
-    const users = await db.select().from(users); // Assumed db and users are available
-    res.json(users);
+    const allUsers = await db.select().from(users);
+    res.json(allUsers);
   });
 
   app.post("/api/admin/wallet", async (req, res) => {
