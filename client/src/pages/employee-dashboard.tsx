@@ -173,6 +173,48 @@ export default function EmployeeDashboard() {
             </CardContent>
           </Card>
         </div>
+
+        <Card className="mt-8">
+          <CardHeader>
+            <CardTitle>Transaction History</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {transactions?.map((transaction) => (
+                <div
+                  key={transaction.id}
+                  className="flex items-center justify-between p-4 border rounded-lg"
+                >
+                  <div>
+                    <p className="font-medium">
+                      Amount: ${transaction.amount}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {format(
+                        new Date(transaction.timestamp),
+                        "MMM d, yyyy h:mm a"
+                      )}
+                    </p>
+                  </div>
+                  <span
+                    className={`px-2 py-1 rounded-full text-sm ${
+                      transaction.status === "completed"
+                        ? "bg-green-100 text-green-800"
+                        : "bg-red-100 text-red-800"
+                    }`}
+                  >
+                    {transaction.status}
+                  </span>
+                </div>
+              ))}
+              {(!transactions || transactions.length === 0) && (
+                <p className="text-center text-muted-foreground">
+                  No transactions yet
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
