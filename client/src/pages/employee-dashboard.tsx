@@ -131,9 +131,7 @@ export default function EmployeeDashboard() {
                       <SelectValue placeholder="Select a vendor" />
                     </SelectTrigger>
                     <SelectContent>
-                      {vendors
-                        ?.filter((v) => v.role === "vendor")
-                        .map((vendor) => (
+                      {vendors?.map((vendor) => (
                           <SelectItem
                             key={vendor.id}
                             value={vendor.id.toString()}
