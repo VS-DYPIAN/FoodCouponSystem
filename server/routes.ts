@@ -106,7 +106,6 @@ export function registerRoutes(app: Express): Server {
       .orderBy(transactions.timestamp);
     res.json(employeeTransactions);
   });
-</old_str>
 
   // Vendor routes
   app.get("/api/vendor/transactions", async (req, res) => {
