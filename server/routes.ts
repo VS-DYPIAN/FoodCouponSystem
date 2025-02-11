@@ -92,8 +92,11 @@ export function registerRoutes(app: Express): Server {
     if (!req.isAuthenticated() || req.user.role !== "employee") {
       return res.sendStatus(403);
     }
-    const transactions = await storage.getTransactionsByEmployee(req.user.id);
-    res.json(transactions);
+    const employeeTransactions = await db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.employeeId, req.user.id));
+    res.json(employeeTransactions);
   });
 
   // Vendor routes
