@@ -93,11 +93,20 @@ export function registerRoutes(app: Express): Server {
       return res.sendStatus(403);
     }
     const employeeTransactions = await db
-      .select()
+      .select({
+        id: transactions.id,
+        amount: transactions.amount,
+        timestamp: transactions.timestamp,
+        status: transactions.status,
+        employeeId: transactions.employeeId,
+        vendorId: transactions.vendorId
+      })
       .from(transactions)
-      .where(eq(transactions.employeeId, req.user.id));
+      .where(eq(transactions.employeeId, req.user.id))
+      .orderBy(transactions.timestamp);
     res.json(employeeTransactions);
   });
+</old_str>
 
   // Vendor routes
   app.get("/api/vendor/transactions", async (req, res) => {
