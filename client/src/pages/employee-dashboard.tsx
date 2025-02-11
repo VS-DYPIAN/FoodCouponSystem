@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { format } from "date-fns";
-import { WalletCards } from "lucide-react";
+import { WalletCards, ArrowDownIcon, ArrowUpIcon } from "lucide-react";
 
 export default function EmployeeDashboard() {
   const { user, logoutMutation } = useAuth();
@@ -174,39 +174,45 @@ export default function EmployeeDashboard() {
         </div>
 
         <Card className="mt-8">
-          <CardHeader>
-            <CardTitle>Transaction History</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Recent Transactions (Last 30 Days)</CardTitle>
+            <Select defaultValue="all">
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Transactions</SelectItem>
+                <SelectItem value="high">High to Low</SelectItem>
+                <SelectItem value="low">Low to High</SelectItem>
+              </SelectContent>
+            </Select>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               {transactions?.map((transaction) => (
                 <div
                   key={transaction.id}
-                  className="flex items-center justify-between p-4 border rounded-lg"
+                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent transition-colors"
                 >
-                  <div>
-                    <p className="font-medium">
-                      Amount: ${transaction.amount}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      To: {transaction.vendorName}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {format(
-                        new Date(transaction.timestamp),
-                        "MMM d, yyyy h:mm a"
-                      )}
-                    </p>
+                  <div className="flex items-center gap-4">
+                    <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                      <WalletCards className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-medium">
+                        Payment to {transaction.vendorName}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {format(new Date(transaction.timestamp), "MMM d, yyyy h:mm a")}
+                      </p>
+                    </div>
                   </div>
-                  <span
-                    className={`px-2 py-1 rounded-full text-sm ${
-                      transaction.status === "completed"
-                        ? "bg-green-100 text-green-800"
-                        : "bg-red-100 text-red-800"
-                    }`}
-                  >
-                    {transaction.status}
-                  </span>
+                  <div className="text-right">
+                    <p className="font-medium text-lg">
+                      -${parseFloat(transaction.amount).toFixed(2)}
+                    </p>
+                    <span className="text-sm text-green-600">Completed</span>
+                  </div>
                 </div>
               ))}
               {(!transactions || transactions.length === 0) && (

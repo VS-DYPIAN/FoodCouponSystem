@@ -118,6 +118,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTransactionsByEmployee(employeeId: number): Promise<Transaction[]> {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
     return db
       .select({
         id: transactions.id,
@@ -126,14 +129,16 @@ export class DatabaseStorage implements IStorage {
         status: transactions.status,
         employeeId: transactions.employeeId,
         vendorId: transactions.vendorId,
-        vendorName: users.username
+        vendorName: users.username,
+        description: transactions.description
       })
       .from(transactions)
       .innerJoin(users, eq(transactions.vendorId, users.id))
       .where(
         and(
           eq(transactions.employeeId, employeeId),
-          eq(transactions.status, "completed")
+          eq(transactions.status, "completed"),
+          gt(transactions.timestamp, thirtyDaysAgo)
         )
       )
       .orderBy(transactions.timestamp, "desc");
