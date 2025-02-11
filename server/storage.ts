@@ -118,30 +118,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTransactionsByEmployee(employeeId: number): Promise<Transaction[]> {
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
-    return db
-      .select({
-        id: transactions.id,
-        amount: transactions.amount,
-        timestamp: transactions.timestamp,
-        status: transactions.status,
-        employeeId: transactions.employeeId,
-        vendorId: transactions.vendorId,
-        vendorName: users.username,
-        description: transactions.description
-      })
-      .from(transactions)
-      .innerJoin(users, eq(transactions.vendorId, users.id))
-      .where(
-        and(
-          eq(transactions.employeeId, employeeId),
-          eq(transactions.status, "completed"),
-          gt(transactions.timestamp, thirtyDaysAgo)
-        )
-      )
-      .orderBy(transactions.timestamp, "desc");
+    return db.select().from(transactions).where(eq(transactions.employeeId, employeeId));
   }
 
   async getTransactionsByVendor(vendorId: number): Promise<Transaction[]> {
