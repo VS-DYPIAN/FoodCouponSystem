@@ -6,10 +6,6 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
 import { User as SelectUser } from "@shared/schema";
-import { randomBytes as randomBytes2 } from "crypto"; // Added import for randomBytes to avoid naming conflict.
-import { sendPasswordResetEmail } from "./email";
-import { users, passwordResetRequestSchema, passwordResetSchema } from "@shared/schema";
-import { and, eq, gt } from "drizzle-orm";
 
 declare global {
   namespace Express {
@@ -95,49 +91,5 @@ export function setupAuth(app: Express) {
   app.get("/api/user", (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     res.json(req.user);
-  });
-
-  // Forgot password request
-  app.post("/api/forgot-password", async (req, res) => {
-    try {
-      const { email } = passwordResetRequestSchema.parse(req.body);
-      const user = await storage.getUserByEmail(email);
-
-      if (!user) {
-        // Return success even if user not found for security
-        return res.json({ message: "If an account exists, you will receive an email" });
-      }
-
-      const resetToken = randomBytes2(32).toString("hex");
-      const expires = new Date();
-      expires.setHours(expires.getHours() + 1); // Token expires in 1 hour
-
-      await storage.updateUserResetToken(user.id, resetToken, expires);
-      await sendPasswordResetEmail(email, resetToken, user.username);
-
-      res.json({ message: "If an account exists, you will receive an email" });
-    } catch (error) {
-      res.status(400).json({ message: error instanceof Error ? error.message : "Invalid request" });
-    }
-  });
-
-  // Reset password with token
-  app.post("/api/reset-password", async (req, res) => {
-    try {
-      const { token, password } = passwordResetSchema.parse(req.body);
-
-      const user = await storage.getUserByResetToken(token);
-      if (!user || !user.resetPasswordExpires || user.resetPasswordExpires < new Date()) {
-        return res.status(400).json({ message: "Invalid or expired reset token" });
-      }
-
-      const hashedPassword = await hashPassword(password);
-      await storage.updateUserPassword(user.id, hashedPassword);
-      await storage.clearUserResetToken(user.id);
-
-      res.json({ message: "Password has been reset successfully" });
-    } catch (error) {
-      res.status(400).json({ message: error instanceof Error ? error.message : "Invalid request" });
-    }
   });
 }
