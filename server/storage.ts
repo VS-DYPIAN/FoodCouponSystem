@@ -130,8 +130,13 @@ export class DatabaseStorage implements IStorage {
       })
       .from(transactions)
       .innerJoin(users, eq(transactions.vendorId, users.id))
-      .where(eq(transactions.employeeId, employeeId))
-      .orderBy(transactions.timestamp);
+      .where(
+        and(
+          eq(transactions.employeeId, employeeId),
+          eq(transactions.status, "completed")
+        )
+      )
+      .orderBy(transactions.timestamp, "desc");
   }
 
   async getTransactionsByVendor(vendorId: number): Promise<Transaction[]> {
