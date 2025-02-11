@@ -17,7 +17,7 @@ export async function sendPasswordResetEmail(
   resetToken: string,
   username: string
 ) {
-  const resetUrl = `${process.env.APP_URL || 'http://localhost:5000'}/auth/reset-password/${resetToken}`;
+  const resetUrl = `${process.env.APP_URL || `http://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`}/auth/reset-password/${resetToken}`;
 
   const mailOptions = {
     from: process.env.EMAIL_USER,
