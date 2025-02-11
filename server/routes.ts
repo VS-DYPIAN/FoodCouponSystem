@@ -102,7 +102,10 @@ export function registerRoutes(app: Express): Server {
         vendorId: transactions.vendorId
       })
       .from(transactions)
-      .where(eq(transactions.employeeId, req.user.id))
+      .where(and(
+        eq(transactions.employeeId, req.user.id),
+        eq(transactions.status, "completed")
+      ))
       .orderBy(transactions.timestamp);
     res.json(employeeTransactions);
   });
