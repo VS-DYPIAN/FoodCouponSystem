@@ -118,7 +118,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTransactionsByEmployee(employeeId: number): Promise<Transaction[]> {
-    return db.select().from(transactions).where(eq(transactions.employeeId, employeeId));
+    return db
+      .select({
+        id: transactions.id,
+        amount: transactions.amount,
+        timestamp: transactions.timestamp,
+        status: transactions.status,
+        employeeId: transactions.employeeId,
+        vendorId: transactions.vendorId,
+        vendorName: users.username
+      })
+      .from(transactions)
+      .innerJoin(users, eq(transactions.vendorId, users.id))
+      .where(eq(transactions.employeeId, employeeId))
+      .orderBy(transactions.timestamp);
   }
 
   async getTransactionsByVendor(vendorId: number): Promise<Transaction[]> {

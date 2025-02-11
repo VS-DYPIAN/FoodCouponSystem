@@ -189,6 +189,9 @@ export default function EmployeeDashboard() {
                       Amount: ${transaction.amount}
                     </p>
                     <p className="text-sm text-muted-foreground">
+                      To: {transaction.vendorName}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
                       {format(
                         new Date(transaction.timestamp),
                         "MMM d, yyyy h:mm a"
