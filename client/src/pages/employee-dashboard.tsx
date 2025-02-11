@@ -65,6 +65,7 @@ export default function EmployeeDashboard() {
       setSelectedVendorId("");
       queryClient.invalidateQueries({ queryKey: ["/api/employee/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vendors"] });
     },
     onError: (error: Error) => {
       toast({
