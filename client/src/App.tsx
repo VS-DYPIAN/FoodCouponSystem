@@ -9,6 +9,7 @@ import AuthPage from "@/pages/auth-page";
 import AdminDashboard from "@/pages/admin-dashboard";
 import EmployeeDashboard from "@/pages/employee-dashboard";
 import VendorDashboard from "@/pages/vendor-dashboard";
+import ResetPassword from "@/pages/reset-password";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -26,6 +27,7 @@ function Router() {
         component={VendorDashboard}
       />
       <Route path="/auth" component={AuthPage} />
+      <Route path="/auth/reset-password/:token" component={ResetPassword} />
       <Route path="/:rest*" component={NotFound} />
     </Switch>
   );
