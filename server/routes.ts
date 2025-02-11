@@ -92,22 +92,8 @@ export function registerRoutes(app: Express): Server {
     if (!req.isAuthenticated() || req.user.role !== "employee") {
       return res.sendStatus(403);
     }
-    const employeeTransactions = await db
-      .select({
-        id: transactions.id,
-        amount: transactions.amount,
-        timestamp: transactions.timestamp,
-        status: transactions.status,
-        employeeId: transactions.employeeId,
-        vendorId: transactions.vendorId
-      })
-      .from(transactions)
-      .where(and(
-        eq(transactions.employeeId, req.user.id),
-        eq(transactions.status, "completed")
-      ))
-      .orderBy(transactions.timestamp);
-    res.json(employeeTransactions);
+    const transactions = await storage.getTransactionsByEmployee(req.user.id);
+    res.json(transactions);
   });
 
   // Vendor routes
