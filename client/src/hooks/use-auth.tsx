@@ -45,7 +45,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return await res.json();
     },
     onSuccess: (user: SelectUser) => {
+      // After successful login, store the user in the cache
       queryClient.setQueryData(["/api/user"], user);
+
+      // Invalidate and refetch the transactions query to get fresh data
+      queryClient.invalidateQueries({
+        queryKey: ["/api/employee/transactions"],
+      });
+
+      // Optionally navigate to the dashboard or the relevant page based on user role
     },
     onError: (error: Error) => {
       toast({

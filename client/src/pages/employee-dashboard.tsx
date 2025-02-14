@@ -33,13 +33,14 @@ export default function EmployeeDashboard() {
     },
   });
 
-  const { data: transactions } = useQuery<Transaction[]>({
+  const { data: transactions, refetch } = useQuery<Transaction[]>({
     queryKey: ["/api/employee/transactions"],
     queryFn: async () => {
       const res = await fetch("/api/employee/transactions");
       if (!res.ok) throw new Error("Failed to fetch transactions");
       return res.json();
     },
+    refetchOnWindowFocus: true,
   });
 
   const payVendorMutation = useMutation({
@@ -63,7 +64,9 @@ export default function EmployeeDashboard() {
       });
       setAmount("");
       setSelectedVendorId("");
-      queryClient.invalidateQueries({ queryKey: ["/api/employee/transactions"] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/employee/transactions"],
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
     },
     onError: (error: Error) => {
@@ -101,7 +104,7 @@ export default function EmployeeDashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-4xl font-bold">${user?.walletBalance}</p>
+              <p className="text-4xl font-bold">₹{user?.walletBalance}</p>
             </CardContent>
           </Card>
 
@@ -186,13 +189,11 @@ export default function EmployeeDashboard() {
                   className="flex items-center justify-between p-4 border rounded-lg"
                 >
                   <div>
-                    <p className="font-medium">
-                      Amount: ${transaction.amount}
-                    </p>
+                    <p className="font-medium">Amount: ₹{transaction.amount}</p>
                     <p className="text-sm text-muted-foreground">
                       {format(
                         new Date(transaction.timestamp),
-                        "MMM d, yyyy h:mm a"
+                        "MMM d, yyyy h:mm a",
                       )}
                     </p>
                   </div>
