@@ -8,6 +8,13 @@ import { CreditCard, ReceiptText } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
+import { FaFilePdf, FaFileExcel } from "react-icons/fa"; 
+
+
+
+import jsPDF from "jspdf";
+import "jspdf-autotable"; // Import this to extend jsPDF with autoTable
+
 
 type TransactionWithEmployee = Transaction & {
   employeeName: string;
@@ -24,6 +31,39 @@ export default function VendorDashboard() {
       return res.json();
     },
   });
+
+
+
+ 
+
+  const downloadExcel = async () => {
+    if (!transactions || transactions.length === 0) {
+      alert("No transactions available to download.");
+      return;
+    }
+  
+    const startDateStr = dateRange.from ? dateRange.from.toISOString().split("T")[0] : "all";
+    const endDateStr = dateRange.to ? dateRange.to.toISOString().split("T")[0] : "all";
+    const fileName = `vendor_transactions_${startDateStr}_to_${endDateStr}.xlsx`;
+  
+    const params = new URLSearchParams({
+      ...(dateRange.from && { startDate: dateRange.from.toISOString() }),
+      ...(dateRange.to && { endDate: dateRange.to.toISOString() }),
+    });
+  
+    const response = await fetch(`/api/vendor/transactions/excel?${params}`);
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  };
+  
 
   // Total Earnings
   const totalEarnings = transactions
@@ -42,34 +82,65 @@ export default function VendorDashboard() {
     to: undefined,
   });
 
-  
-
-  const downloadCSV = async () => {
+  //
+  const downloadPDF = () => {
     if (!transactions || transactions.length === 0) {
       alert("No transactions available to download.");
       return;
     }
-
-    const startDateStr = dateRange.from ? dateRange.from.toISOString().split("T")[0] : "all";
-    const endDateStr = dateRange.to ? dateRange.to.toISOString().split("T")[0] : "all";
-    const fileName = `vendor_transactions_${startDateStr}_to_${endDateStr}.csv`;
-
-    const params = new URLSearchParams({
-      ...(dateRange.from && { startDate: dateRange.from.toISOString() }),
-      ...(dateRange.to && { endDate: dateRange.to.toISOString() }),
+  
+    // Filter transactions based on date range
+    const filteredTransactions = transactions.filter((transaction) => {
+      const transactionDate = new Date(transaction.timestamp);
+      const fromDate = dateRange.from ? new Date(dateRange.from) : null;
+      const toDate = dateRange.to ? new Date(dateRange.to) : null;
+  
+      return (!fromDate || transactionDate >= fromDate) && (!toDate || transactionDate <= toDate);
     });
-
-    const response = await fetch(`/api/vendor/transactions/csv?${params}`);
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
+  
+    if (filteredTransactions.length === 0) {
+      alert("No transactions found for the selected date range.");
+      return;
+    }
+  
+    const doc = new jsPDF();
+    doc.text("Vendor Transactions Report", 14, 10);
+  
+    // Display selected date range
+    const startDateStr = dateRange.from ? format(dateRange.from, "MMM d, yyyy") : "All";
+    const endDateStr = dateRange.to ? format(dateRange.to, "MMM d, yyyy") : "All";
+    doc.text(`Date Range: ${startDateStr} - ${endDateStr}`, 14, 20);
+  
+    const tableColumn = ["Transaction ID","Amount", "Status", "Date"];
+    const tableRows: any[] = [];
+  
+    filteredTransactions.forEach((transaction) => {
+      const transactionData = [
+        transaction.transactionId,
+        transaction.amount,
+        transaction.status,
+        format(new Date(transaction.timestamp), "MMM d, yyyy h:mm a"),
+      ];
+      tableRows.push(transactionData);
+    });
+  
+    (doc as any).autoTable({
+      head: [tableColumn],
+      body: tableRows,
+      startY: 30, // Adjust to avoid overlap with the date range text
+    });
+  
+    const fileName = `transactions_${startDateStr}_to_${endDateStr}.pdf`;
+    doc.save(fileName);
   };
+  
+  
+
+  
+ 
+
+  
+  
 
   return (
     <div className="min-h-screen bg-background p-8">
@@ -137,36 +208,48 @@ export default function VendorDashboard() {
             <CardTitle>Transaction History</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div className="flex gap-4 items-center">
-                <div className="grid gap-2">
-                  <Label>Date Range</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      type="date"
-                      value={dateRange.from?.toISOString().split("T")[0] || ""}
-                      onChange={(e) =>
-                        setDateRange((prev) => ({
-                          ...prev,
-                          from: e.target.value ? new Date(e.target.value) : undefined,
-                        }))
-                      }
-                    />
-                    <Input
-                      type="date"
-                      value={dateRange.to?.toISOString().split("T")[0] || ""}
-                      onChange={(e) =>
-                        setDateRange((prev) => ({
-                          ...prev,
-                          to: e.target.value ? new Date(e.target.value) : undefined,
-                        }))
-                      }
-                    />
-                  </div>
-                </div>
-                <Button onClick={downloadCSV}>Download CSV Report</Button>
-              </div>
-            </div>
+{/* Date Range & Download Buttons */}
+<div className="grid gap-4 md:flex md:items-center md:justify-between">
+  {/* Date Range Picker */}
+  <div className="flex flex-col gap-2 w-full md:w-auto">
+    <Label className="font-medium">Date Range</Label>
+    <div className="flex flex-wrap gap-2">
+      <Input
+        type="date"
+        value={dateRange.from?.toISOString().split("T")[0] || ""}
+        onChange={(e) =>
+          setDateRange((prev) => ({
+            ...prev,
+            from: e.target.value ? new Date(e.target.value) : undefined,
+          }))
+        }
+        className="w-full md:w-auto"
+      />
+      <Input
+        type="date"
+        value={dateRange.to?.toISOString().split("T")[0] || ""}
+        onChange={(e) =>
+          setDateRange((prev) => ({
+            ...prev,
+            to: e.target.value ? new Date(e.target.value) : undefined,
+          }))
+        }
+        className="w-full md:w-auto"
+      />
+    </div>
+  </div>
+
+  {/* Download Buttons with Icons */}
+  <div className="flex flex-wrap gap-2 w-full md:w-auto">
+    <Button onClick={downloadExcel} className="flex items-center gap-2 w-full md:w-auto">
+      <FaFileExcel className="text-green-600" /> Download CSV
+    </Button>
+    <Button onClick={downloadPDF} className="flex items-center gap-2 w-full md:w-auto">
+      <FaFilePdf className="text-red-600" /> Download PDF
+    </Button>
+  </div>
+</div>
+<br></br>
 
             <div className="space-y-4">
               {transactions

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { User, Transaction } from "@shared/schema";
@@ -23,6 +23,7 @@ export default function EmployeeDashboard() {
   const { toast } = useToast();
   const [selectedVendorId, setSelectedVendorId] = useState<string>("");
   const [amount, setAmount] = useState("");
+  
 
   const { data: vendors } = useQuery<User[]>({
     queryKey: ["/api/vendors"],
@@ -44,13 +45,7 @@ export default function EmployeeDashboard() {
   });
 
   const payVendorMutation = useMutation({
-    mutationFn: async ({
-      vendorId,
-      amount,
-    }: {
-      vendorId: number;
-      amount: number;
-    }) => {
+    mutationFn: async ({ vendorId, amount }: { vendorId: number; amount: number }) => {
       const res = await apiRequest("POST", "/api/employee/pay", {
         vendorId,
         amount,
@@ -58,29 +53,24 @@ export default function EmployeeDashboard() {
       return res.json();
     },
     onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "Payment completed successfully",
-      });
+     
       setAmount("");
       setSelectedVendorId("");
-      queryClient.invalidateQueries({
-        queryKey: ["/api/employee/transactions"],
-      });
+
+      queryClient.invalidateQueries({ queryKey: ["/api/employee/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+
+      // Redirect using window.location
+      window.location.href = "/payment";
+
+      
     },
   });
 
   return (
     <div className="min-h-screen bg-background p-8">
       <div className="max-w-6xl mx-auto">
+        {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Employee Dashboard</h1>
           <div className="flex items-center gap-4">
@@ -95,6 +85,9 @@ export default function EmployeeDashboard() {
           </div>
         </div>
 
+        
+
+        {/* Payment Form */}
         <div className="grid gap-8 md:grid-cols-2">
           <Card>
             <CardHeader>
@@ -118,7 +111,7 @@ export default function EmployeeDashboard() {
                   e.preventDefault();
                   if (!selectedVendorId || !amount) return;
 
-                  // ✅ Confirmation before payment
+                  // Confirmation before payment
                   const isConfirmed = window.confirm(
                     `Are you sure you want to proceed with a payment of ₹${amount}?`
                   );
@@ -185,6 +178,7 @@ export default function EmployeeDashboard() {
           </Card>
         </div>
 
+        {/* Transaction History */}
         <Card className="mt-8">
           <CardHeader>
             <CardTitle>Transaction History</CardTitle>
@@ -198,10 +192,11 @@ export default function EmployeeDashboard() {
                 >
                   <div>
                     <p className="font-medium">Amount: ₹{transaction.amount}</p>
+                    <p className="font-medium">Transaction ID: {transaction.transactionId}</p>
                     <p className="text-sm text-muted-foreground">
                       {format(
                         new Date(transaction.timestamp),
-                        "MMM d, yyyy h:mm a",
+                        "MMM d, yyyy h:mm a"
                       )}
                     </p>
                   </div>

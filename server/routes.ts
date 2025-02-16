@@ -7,11 +7,102 @@ import { z } from "zod";
 import { users, transactions } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { sendNotification } from "./websocket";
-import PDFDocument from "pdfkit";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
+//import { Workbook, Cell, Row, Column, Worksheet } from "exceljs";
+import ExcelJS from "exceljs";
+const workbook = new ExcelJS.Workbook();
+
 
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
+
+  app.get("/api/vendor/transactions/excel", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "vendor") {
+      return res.sendStatus(403);
+    }
+  
+    try {
+      const { startDate, endDate } = req.query;
+      let transactions = await storage.getTransactions(req.user.id);
+  
+      if (startDate && endDate) {
+        const start = new Date(startDate as string);
+        const end = new Date(endDate as string);
+        end.setHours(23, 59, 59, 999);
+        transactions = transactions.filter((t) => {
+          const date = new Date(t.timestamp);
+          return date >= start && date <= end;
+        });
+      }
+  
+      // Initialize a new Excel workbook
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Vendor Transactions");
+  
+      // Define headers
+      const headers = ["Transaction ID", "Amount (₹)", "Status", "Date & Time"];
+      
+      // Add headers to worksheet
+      worksheet.addRow(headers);
+  
+      // Apply header styling (Bold, Blue background, White text, Centered)
+      const headerRow = worksheet.getRow(1);
+      headerRow.eachCell((cell, colNum) => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "4F81BD" } }; // Blue background
+        cell.font = { bold: true, color: { argb: "FFFFFF" } }; // White text
+        cell.alignment = { horizontal: "center" };
+        cell.border = {
+          top: { style: "thin" },
+          bottom: { style: "thin" },
+          left: { style: "thin" },
+          right: { style: "thin" },
+        };
+      });
+  
+      // Populate data rows
+      transactions.forEach((t) => {
+        const row = worksheet.addRow([
+          t.transactionId,
+          
+          `₹${parseFloat(t.amount).toFixed(2)}`,
+          t.status,
+          new Date(t.timestamp).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
+        ]);
+  
+        // Apply border to each cell in the row
+        row.eachCell((cell) => {
+          cell.border = {
+            top: { style: "thin" },
+            bottom: { style: "thin" },
+            left: { style: "thin" },
+            right: { style: "thin" },
+          };
+        });
+      });
+  
+      // Adjust column widths
+      worksheet.columns = [
+        { width: 35 }, // Transaction ID
+        { width: 15 }, // Amount
+        { width: 15 }, // Status
+        { width: 40 }, // Date & Time
+      ];
+  
+      // Convert workbook to buffer and send response
+      const fileName = `vendor_transactions_${startDate || "all"}_to_${endDate || "all"}.xlsx`;
+      res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  
+      const buffer = await workbook.xlsx.writeBuffer();
+      res.send(buffer);
+    } catch (error) {
+      res.status(500).json({ message: "Error generating Excel report", error: error instanceof Error ? error.message : "Unknown error occurred" });
+    }
+  });
+  
 
   // Admin routes
   app.get("/api/users", async (req, res) => {
@@ -117,7 +208,50 @@ export function registerRoutes(app: Express): Server {
     res.json(transactions);
   });
 
+  //
+  app.get("/api/vendor/transactions/pdf", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "vendor") {
+      return res.sendStatus(403);
+    }
+  
+    try {
+      const transactions = await storage.getAdminTransactions();
+  
+      const doc = new jsPDF();
+      doc.text("Admin Transactions Report", 14, 10);
+  
+      // Define table headers
+      const headers = [["Transaction ID", "Date", "Amount", "Status"]];
+      const data = transactions.map((t) => [
+        t.transactionId,
+        new Date(t.timestamp).toLocaleString(),
+        `$${t.amount}`,
+        t.status,
+      ]);
+  
+      // Add table to PDF
+      autoTable(doc, {
+        head: headers,
+        body: data,
+        startY: 20,
+      });
+  
+      const fileName = `Admin_Transactions_${new Date().toISOString().split("T")[0]}.pdf`;
+  
+      // Send the file as a response
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
+      const pdfOutput = doc.output("arraybuffer");
+  
+      res.send(Buffer.from(pdfOutput));
+    } catch (error) {
+      res.status(500).json({ message: "Error generating PDF", error: (error as Error).message });
+    }
+  });
 
+ 
+  
+  
   // Get vendor transactions CSV
   app.get("/api/vendor/transactions/csv", async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== "vendor") {

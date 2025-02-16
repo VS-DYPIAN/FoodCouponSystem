@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { FaFilePdf, FaFileCsv } from "react-icons/fa"; // Importing icons
 import {
   Table,
   TableBody,
@@ -16,6 +17,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import jsPDF from "jspdf";
+
 
 // Placeholder for date formatting (replace with actual implementation)
 const format = (date: Date, formatString: string) => date.toLocaleString();
@@ -51,6 +54,60 @@ export default function AdminDashboard() {
     from: undefined,
     to: undefined
   });
+
+  //
+  const downloadPDF = () => {
+    if (!adminTransactions || adminTransactions.length === 0) {
+      alert("No transactions available to download.");
+      return;
+    }
+  
+    // Filter transactions based on date range
+    const filteredTransactions = adminTransactions.filter((transaction) => {
+      const transactionDate = new Date(transaction.timestamp);
+      const fromDate = dateRange.from ? new Date(dateRange.from) : null;
+      const toDate = dateRange.to ? new Date(dateRange.to) : null;
+  
+      return (!fromDate || transactionDate >= fromDate) && (!toDate || transactionDate <= toDate);
+    });
+  
+    if (filteredTransactions.length === 0) {
+      alert("No transactions found for the selected date range.");
+      return;
+    }
+  
+    const doc = new jsPDF();
+    doc.text("Transactions Report", 14, 10);
+  
+    // Display selected date range
+    const startDateStr = dateRange.from ? dateRange.from.toLocaleDateString() : "All";
+    const endDateStr = dateRange.to ? dateRange.to.toLocaleDateString() : "All";
+    doc.text(`Date Range: ${startDateStr} - ${endDateStr}`, 14, 20);
+  
+    const tableColumn = ["Transaction ID", "Amount", "Status", "Date"];
+    const tableRows: any[] = [];
+  
+    filteredTransactions.forEach((transaction) => {
+      const transactionData = [
+        transaction.transactionId,
+        `${Number(transaction.amount).toFixed(2)}`,
+        transaction.status,
+        new Date(transaction.timestamp).toLocaleString(),
+      ];
+      tableRows.push(transactionData);
+    });
+  
+    (doc as any).autoTable({
+      head: [tableColumn],
+      body: tableRows,
+      startY: 30,
+    });
+  
+    const fileName = `transactions_${startDateStr}_to_${endDateStr}.pdf`;
+    doc.save(fileName);
+  };
+    
+
 
   const downloadCSV = async () => {
     const params = new URLSearchParams({
@@ -231,58 +288,72 @@ export default function AdminDashboard() {
               <CardTitle>Transaction Report</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="flex gap-4 items-center">
-                  <div className="grid gap-2">
-                    <Label>Date Range</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        type="date"
-                        value={dateRange.from?.toISOString().split('T')[0] || ''}
-                        onChange={(e) => setDateRange(prev => ({ ...prev, from: e.target.value ? new Date(e.target.value) : undefined }))}
-                      />
-                      <Input
-                        type="date"
-                        value={dateRange.to?.toISOString().split('T')[0] || ''}
-                        onChange={(e) => setDateRange(prev => ({ ...prev, to: e.target.value ? new Date(e.target.value) : undefined }))}
-                      />
-                    </div>
-                  </div>
-                  <Button onClick={downloadCSV}>Download CSV Report</Button>
-                </div>
+            <div className="space-y-4">
+  <div className="flex flex-wrap gap-4 items-center justify-center md:justify-between">
+    <div className="grid gap-2 w-full md:w-auto">
+      <Label>Date Range</Label>
+      <div className="flex flex-wrap gap-2">
+        <Input
+          type="date"
+          value={dateRange.from?.toISOString().split('T')[0] || ''}
+          onChange={(e) => setDateRange(prev => ({ ...prev, from: e.target.value ? new Date(e.target.value) : undefined }))}
+          className="w-full md:w-auto"
+        />
+        <Input
+          type="date"
+          value={dateRange.to?.toISOString().split('T')[0] || ''}
+          onChange={(e) => setDateRange(prev => ({ ...prev, to: e.target.value ? new Date(e.target.value) : undefined }))}
+          className="w-full md:w-auto"
+        />
+      </div>
+    </div>
+    
+    {/* Download Buttons */}
+<div className="flex flex-wrap gap-2 w-full md:w-auto justify-center md:justify-end">
+  <Button onClick={downloadCSV} className="w-full md:w-auto flex items-center gap-2">
+    <FaFileCsv className="text-green-600" /> Download CSV
+  </Button>
+  <Button onClick={downloadPDF} className="w-full md:w-auto flex items-center gap-2">
+    <FaFilePdf className="text-red-600" /> Download PDF
+  </Button>
+</div>
+  </div>
 
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Employee</TableHead>
-                      <TableHead>Amount</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-  {adminTransactions?.length ? (
-    adminTransactions.map((transaction) => (
-      <TableRow key={transaction.id}>
-        <TableCell>
-          {format(new Date(transaction.timestamp), "MMM d, yyyy HH:mm")}
-        </TableCell>
-        <TableCell>
-          {users ? users.find(u => u.id === transaction.employeeId)?.username ?? "Unknown" : "Loading..."}
-        </TableCell>
-        <TableCell>₹{!isNaN(Number(transaction.amount)) ? Number(transaction.amount).toFixed(2) : "N/A"}</TableCell>
-      </TableRow>
-    ))
-  ) : (
-    <TableRow>
-      <TableCell colSpan={3} className="text-center">
-        No transactions found
-      </TableCell>
-    </TableRow>
-  )}
-</TableBody>
+  {/* Responsive Table */}
+  <div className="overflow-x-auto">
+    <Table className="w-full">
+      <TableHeader>
+        <TableRow>
+          <TableHead>Date</TableHead>
+          <TableHead>Employee</TableHead>
+          <TableHead>Amount</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {adminTransactions?.length ? (
+          adminTransactions.map((transaction) => (
+            <TableRow key={transaction.id}>
+              <TableCell>
+                {format(new Date(transaction.timestamp), "MMM d, yyyy HH:mm")}
+              </TableCell>
+              <TableCell>
+                {users ? users.find(u => u.id === transaction.employeeId)?.username ?? "Unknown" : "Loading..."}
+              </TableCell>
+              <TableCell>₹{!isNaN(Number(transaction.amount)) ? Number(transaction.amount).toFixed(2) : "N/A"}</TableCell>
+            </TableRow>
+          ))
+        ) : (
+          <TableRow>
+            <TableCell colSpan={3} className="text-center">
+              No transactions found
+            </TableCell>
+          </TableRow>
+        )}
+      </TableBody>
+    </Table>
+  </div>
+</div>
 
-                </Table>
-              </div>
             </CardContent>
           </Card>
         </div>
