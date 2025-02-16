@@ -7,6 +7,8 @@ import { z } from "zod";
 import { users, transactions } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { sendNotification } from "./websocket";
+import PDFDocument from "pdfkit";
+
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
@@ -29,7 +31,6 @@ export function registerRoutes(app: Express): Server {
     try {
       const user = await storage.updateUserWallet(userId, parseFloat(amount));
 
-      // Send notification to user about wallet update
       sendNotification({
         type: "wallet_update",
         message: `Your wallet has been updated by ${amount}`,
@@ -42,6 +43,26 @@ export function registerRoutes(app: Express): Server {
       res.status(400).json({ message: (error as Error).message });
     }
   });
+ // ✅ Fixed: Admin bulk wallet update ensures `walletBalance` is stored as a number
+ app.post("/api/admin/wallet/update-all", async (req, res) => {
+  if (!req.isAuthenticated() || req.user.role !== "admin") {
+    return res.sendStatus(403);
+  }
+
+  const { amount } = req.body;
+
+  if (!amount || isNaN(amount)) {
+    return res.status(400).json({ message: "Invalid amount provided." });
+  }
+
+  try {
+    await db.update(users).set({ walletBalance: amount }).where(eq(users.role, "employee"));
+
+    res.json({ success: true, message: `Wallet balance updated for all employees to ${amount}.` });
+  } catch (error) {
+    res.status(500).json({ message: (error as Error).message });
+  }
+});
 
   // Employee routes
   app.get("/api/vendors", async (req, res) => {
@@ -68,7 +89,6 @@ export function registerRoutes(app: Express): Server {
         status: "completed",
       });
 
-      // Send notifications to both employee and vendor
       sendNotification({
         type: "transaction",
         message: `Payment of $${amount} sent to vendor`,
@@ -78,7 +98,7 @@ export function registerRoutes(app: Express): Server {
 
       sendNotification({
         type: "transaction",
-        message: `Received payment of $${amount} from ${req.user.username}`,
+        message: `Received payment of $${amount}. Transaction ID: ${transaction.id}`,
         timestamp: transaction.timestamp.toISOString(),
         recipientId: vendorId,
       });
@@ -97,18 +117,17 @@ export function registerRoutes(app: Express): Server {
     res.json(transactions);
   });
 
+
   // Get vendor transactions CSV
   app.get("/api/vendor/transactions/csv", async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== "vendor") {
       return res.sendStatus(403);
     }
-  
+
     try {
       const { startDate, endDate } = req.query;
       let transactions = await storage.getTransactions(req.user.id);
-      const users = await storage.getAllUsers();
-  
-      // Filter transactions by date range
+
       if (startDate && endDate) {
         const start = new Date(startDate as string);
         const end = new Date(endDate as string);
@@ -118,94 +137,71 @@ export function registerRoutes(app: Express): Server {
           return date >= start && date <= end;
         });
       }
-  
-      // Construct dynamic filename
-      const startDateStr = startDate ? startDate.toString().split("T")[0] : "all";
-      const endDateStr = endDate ? endDate.toString().split("T")[0] : "all";
-      const fileName = `vendor_transactions_${startDateStr}_to_${endDateStr}.csv`;
-  
-      // Set headers for CSV response
+
+      const fileName = `vendor_transactions_${startDate || "all"}_to_${endDate || "all"}.csv`;
       res.setHeader("Content-Type", "text/csv");
       res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
-  
-      // CSV header
-      res.write("Transaction ID, Date, Employee, Amount, Status\n");
-  
-      // Stream transaction data
+
+      res.write("Transaction ID, Date, Amount, Status\n");
+
       transactions.forEach((t) => {
-        const employee = users.find((u) => u.id === t.employeeId)?.username || "Unknown";
-        res.write(`${t.id},${new Date(t.timestamp).toISOString()},${employee},${t.amount},${t.status}\n`);
+        res.write(`${t.transactionId},${new Date(t.timestamp).toISOString()},${t.amount},${t.status}\n`);
       });
-  
+
       res.end();
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-      res.status(500).json({ message: "Error generating CSV report", error: errorMessage });
+      res.status(500).json({ message: "Error generating CSV report", error: error instanceof Error ? error.message : "Unknown error occurred" });
     }
   });
-  
-  
 
-// Get admin transactions report
-// Get admin transactions report
-app.get("/api/admin/transactions/csv", async (req, res) => {
-  if (!req.user || req.user.role !== "admin") {
-    return res.sendStatus(403);
-  }
-
-  const { startDate, endDate, format } = req.query;
-
-  try {
-    const transactions = await storage.getAdminTransactions();
-    const users = await storage.getAllUsers();
-
-    let filteredTransactions = transactions;
-
-    // Filter transactions by date range
-    let fileStartDate = "all";
-    let fileEndDate = "dates";
-
-    if (startDate && endDate) {
-      const start = new Date(startDate as string);
-      const end = new Date(endDate as string);
-      end.setHours(23, 59, 59, 999); // Make sure endDate is inclusive of the whole day
-
-      filteredTransactions = transactions.filter((t) => {
-        const date = new Date(t.timestamp);
-        return date >= start && date <= end;
-      });
-
-      // Format dates for filename (YYYY-MM-DD)
-      fileStartDate = start.toISOString().split("T")[0];
-      fileEndDate = end.toISOString().split("T")[0];
+  // Get admin transactions CSV
+  app.get("/api/admin/transactions/csv", async (req, res) => {
+    if (!req.user || req.user.role !== "admin") {
+      return res.sendStatus(403);
     }
 
-    // Handle CSV format
-    if (format === 'csv') {
-      const fileName = `BalanceReport_${fileStartDate}_to_${fileEndDate}.csv`;
-      res.setHeader("Content-Type", "text/csv");
-      res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
+    const { startDate, endDate, format } = req.query;
 
-      // Write CSV header
-      res.write("Date,Employee,Amount\n");
+    try {
+      const transactions = await storage.getAdminTransactions();
 
-      // Write CSV data
-      filteredTransactions.forEach((t) => {
-        const employee = users.find((u) => u.id === t.employeeId)?.username || t.employeeId;
-        res.write(`${new Date(t.timestamp).toISOString()},${employee},${t.amount}\n`);
-      });
+      let filteredTransactions = transactions;
+      let fileStartDate = "all";
+      let fileEndDate = "dates";
 
-      res.end();
-    } else {
-      // If not CSV, return JSON response
-      res.json(filteredTransactions);
+      if (startDate && endDate) {
+        const start = new Date(startDate as string);
+        const end = new Date(endDate as string);
+        end.setHours(23, 59, 59, 999);
+
+        filteredTransactions = transactions.filter((t) => {
+          const date = new Date(t.timestamp);
+          return date >= start && date <= end;
+        });
+
+        fileStartDate = start.toISOString().split("T")[0];
+        fileEndDate = end.toISOString().split("T")[0];
+      }
+
+      if (format === 'csv') {
+        const fileName = `BalanceReport_${fileStartDate}_to_${fileEndDate}.csv`;
+        res.setHeader("Content-Type", "text/csv");
+        res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
+
+        res.write("Transaction ID, Date, Amount\n");
+
+        filteredTransactions.forEach((t) => {
+          res.write(`${t.transactionId},${new Date(t.timestamp).toISOString()},${t.amount}\n`);
+        });
+
+        res.end();
+      } else {
+        res.json(filteredTransactions);
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Error generating CSV report", error: error instanceof Error ? error.message : "Unknown error occurred" });
     }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    res.status(500).json({ message: "Error generating CSV report", error: errorMessage });
-  }
-});
-
+  });
 
   // Vendor routes
   app.get("/api/vendor/transactions", async (req, res) => {
@@ -218,11 +214,9 @@ app.get("/api/admin/transactions/csv", async (req, res) => {
         amount: transactions.amount,
         timestamp: transactions.timestamp,
         status: transactions.status,
-        employeeId: transactions.employeeId,
-        employeeName: users.username,
+        transactionId: transactions.transactionId
       })
       .from(transactions)
-      .innerJoin(users, eq(transactions.employeeId, users.id))
       .where(eq(transactions.vendorId, req.user.id));
 
     res.json(vendorTransactions);

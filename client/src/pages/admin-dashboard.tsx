@@ -25,6 +25,7 @@ export default function AdminDashboard() {
   const { toast } = useToast();
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [amount, setAmount] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");  // Add searchTerm state for filtering
 
   const { data: users } = useQuery<User[]>({
     queryKey: ["/api/users"],
@@ -52,30 +53,23 @@ export default function AdminDashboard() {
   });
 
   const downloadCSV = async () => {
-    const startDateStr = dateRange.from ? dateRange.from.toISOString().split("T")[0] : "all";
-    const endDateStr = dateRange.to ? dateRange.to.toISOString().split("T")[0] : "all";
-    const fileName = `transactions_${startDateStr}_to_${endDateStr}.csv`;
-  
     const params = new URLSearchParams({
-      format: "csv",
+      format: 'csv',
       ...(dateRange.from && { startDate: dateRange.from.toISOString() }),
-      ...(dateRange.to && { endDate: dateRange.to.toISOString() }),
+      ...(dateRange.to && { endDate: dateRange.to.toISOString() })
     });
-  
+
     const response = await fetch(`/api/admin/transactions/csv?${params}`);
     const blob = await response.blob();
     const url = window.URL.createObjectURL(blob);
-    
-    const a = document.createElement("a");
+    const a = document.createElement('a');
     a.href = url;
-    a.download = fileName;
+    a.download = 'transactions.csv';
     document.body.appendChild(a);
     a.click();
-    
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
   };
-  
 
   const updateWalletMutation = useMutation({
     mutationFn: async ({ userId, amount }: { userId: number; amount: string }) => {
@@ -102,6 +96,31 @@ export default function AdminDashboard() {
       });
     },
   });
+  const updateAllWalletsMutation = useMutation({
+    mutationFn: async ({ amount }: { amount: string }) => {
+      const res = await apiRequest("POST", "/api/admin/wallet/update-all", { amount });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Wallet balance updated for all employees",
+      });
+      setAmount(""); // Clear the input after success
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+  
+  
+  
+  
 
   return (
     <div className="min-h-screen bg-background p-8">
@@ -115,6 +134,33 @@ export default function AdminDashboard() {
             </Button>
           </div>
         </div>
+        <div className="flex justify-between items-center mb-4 p-4 bg-muted rounded-lg shadow-sm">
+  <h2 className="text-lg font-semibold">Employee Wallet Management</h2>
+  
+  <div className="flex items-center gap-4">
+    {/* Input for Amount */}
+    <Input
+      type="number"
+      step="0.01"
+      value={amount}
+      onChange={(e) => setAmount(e.target.value)}
+      placeholder="Enter amount"
+      className="w-32"
+    />
+    
+    {/* Update Balances Button */}
+    <Button 
+      variant="destructive" 
+      onClick={() => updateAllWalletsMutation.mutate({ amount })}
+      disabled={updateAllWalletsMutation.isPending || !amount}
+      className="w-full md:w-auto"
+    >
+      {updateAllWalletsMutation.isPending ? "Updating..." : "Update Balances"}
+    </Button>
+  </div>
+</div>
+
+
 
         <div className="grid gap-8 md:grid-cols-2">
           <Card>
@@ -122,19 +168,29 @@ export default function AdminDashboard() {
               <CardTitle>Employee List</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {users?.filter((u) => u.role === "employee").map((employee) => (
-                <div key={employee.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <p className="font-medium">{employee.username}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Balance: ${employee.walletBalance}
-                    </p>
+              <div className="flex items-center gap-4 mb-4">
+                <Label htmlFor="employeeSearch">Search Employee</Label>
+                <Input
+                  id="employeeSearch"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Enter employee name"
+                />
+              </div>
+              {users?.filter((u) => u.role === "employee" && u.username.toLowerCase().includes(searchTerm.toLowerCase()))
+                .map((employee) => (
+                  <div key={employee.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div>
+                      <p className="font-medium">{employee.username}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Balance: ₹{employee.walletBalance}
+                      </p>
+                    </div>
+                    <Button variant="outline" onClick={() => setSelectedUserId(employee.id)}>
+                      Update Balance
+                    </Button>
                   </div>
-                  <Button variant="outline" onClick={() => setSelectedUserId(employee.id)}>
-                    Update Balance
-                  </Button>
-                </div>
-              ))}
+                ))}
             </CardContent>
           </Card>
 
@@ -200,22 +256,31 @@ export default function AdminDashboard() {
                     <TableRow>
                       <TableHead>Date</TableHead>
                       <TableHead>Employee</TableHead>
-                      <TableHead>Amount Added</TableHead>
+                      <TableHead>Amount</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {adminTransactions?.map((transaction) => (
-                      <TableRow key={transaction.id}>
-                        <TableCell>
-                          {format(new Date(transaction.timestamp), "MMM d, yyyy HH:mm")}
-                        </TableCell>
-                        <TableCell>
-                          {users?.find(u => u.id === transaction.employeeId)?.username || transaction.employeeId}
-                        </TableCell>
-                        <TableCell>${Number(transaction.amount).toFixed(2)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
+  {adminTransactions?.length ? (
+    adminTransactions.map((transaction) => (
+      <TableRow key={transaction.id}>
+        <TableCell>
+          {format(new Date(transaction.timestamp), "MMM d, yyyy HH:mm")}
+        </TableCell>
+        <TableCell>
+          {users ? users.find(u => u.id === transaction.employeeId)?.username ?? "Unknown" : "Loading..."}
+        </TableCell>
+        <TableCell>₹{!isNaN(Number(transaction.amount)) ? Number(transaction.amount).toFixed(2) : "N/A"}</TableCell>
+      </TableRow>
+    ))
+  ) : (
+    <TableRow>
+      <TableCell colSpan={3} className="text-center">
+        No transactions found
+      </TableCell>
+    </TableRow>
+  )}
+</TableBody>
+
                 </Table>
               </div>
             </CardContent>

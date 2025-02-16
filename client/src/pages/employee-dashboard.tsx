@@ -117,6 +117,14 @@ export default function EmployeeDashboard() {
                 onSubmit={(e) => {
                   e.preventDefault();
                   if (!selectedVendorId || !amount) return;
+
+                  // ✅ Confirmation before payment
+                  const isConfirmed = window.confirm(
+                    `Are you sure you want to proceed with a payment of ₹${amount}?`
+                  );
+
+                  if (!isConfirmed) return;
+
                   payVendorMutation.mutate({
                     vendorId: parseInt(selectedVendorId),
                     amount: parseFloat(amount),

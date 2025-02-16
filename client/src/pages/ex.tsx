@@ -21,18 +21,18 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
+ 
 // Define schema without role selection
 const loginSchema = z.object({
   username: z.string().min(1, "Username is required"),
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
-
+ 
 const registerSchema = loginSchema; // No role needed
-
+ 
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
-
+ 
   const loginForm = useForm({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -40,7 +40,7 @@ export default function AuthPage() {
       password: "",
     },
   });
-
+ 
   const registerForm = useForm({
     resolver: zodResolver(registerSchema),
     defaultValues: {
@@ -48,7 +48,7 @@ export default function AuthPage() {
       password: "",
     },
   });
-
+ 
   if (user) {
     const redirectPath = {
       admin: "/",
@@ -57,7 +57,7 @@ export default function AuthPage() {
     }[user.role];
     return <Redirect to={redirectPath} />;
   }
-
+ 
   return (
     <div className="min-h-screen flex">
       <div className="flex-1 flex items-center justify-center p-8">
@@ -74,7 +74,7 @@ export default function AuthPage() {
                 <TabsTrigger value="login">Login</TabsTrigger>
                 <TabsTrigger value="register">Register</TabsTrigger>
               </TabsList>
-
+ 
               {/* Login Form */}
               <TabsContent value="login">
                 <Form {...loginForm}>
@@ -120,7 +120,7 @@ export default function AuthPage() {
                   </form>
                 </Form>
               </TabsContent>
-
+ 
               {/* Register Form */}
               <TabsContent value="register">
                 <Form {...registerForm}>
@@ -170,7 +170,7 @@ export default function AuthPage() {
           </CardContent>
         </Card>
       </div>
-
+ 
       {/* Right-side Banner */}
       <div className="hidden lg:flex flex-1 bg-slate-100 items-center justify-center p-8">
         <div className="max-w-lg text-center">

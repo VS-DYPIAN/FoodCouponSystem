@@ -42,6 +42,8 @@ export default function VendorDashboard() {
     to: undefined,
   });
 
+  
+
   const downloadCSV = async () => {
     if (!transactions || transactions.length === 0) {
       alert("No transactions available to download.");
@@ -177,7 +179,9 @@ export default function VendorDashboard() {
                   >
                     <div>
                       <p className="font-medium">Amount: ₹{transaction.amount}</p>
-                      <p className="text-sm text-muted-foreground">From: {transaction.employeeName}</p>
+                      <p className="text-sm font-semibold text-gray-700">
+                        Transaction ID: {transaction.transactionId}
+                      </p>
                       <p className="text-sm text-muted-foreground">
                         {format(new Date(transaction.timestamp), "MMM d, yyyy h:mm a")}
                       </p>

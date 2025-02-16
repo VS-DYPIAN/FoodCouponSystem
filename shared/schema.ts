@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, decimal, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, decimal, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -17,15 +17,23 @@ export const transactions = pgTable("transactions", {
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   timestamp: timestamp("timestamp").defaultNow().notNull(),
   status: text("status", { enum: ["pending", "completed", "failed"] }).notNull(),
+  transactionId: text("transaction_id").unique().notNull(), // ✅ Added transaction ID
 });
 
+// Ensure transaction_id is included in validation schemas
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
   role: true,
 });
 
-export const insertTransactionSchema = createInsertSchema(transactions);
+export const insertTransactionSchema = createInsertSchema(transactions).pick({
+  employeeId: true,
+  vendorId: true,
+  amount: true,
+  status: true,
+  transactionId: true, // ✅ Include transactionId in schema
+});
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;

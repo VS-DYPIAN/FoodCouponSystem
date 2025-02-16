@@ -4,6 +4,7 @@ import { eq, desc, or } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import pool from "./db"; // Ensure we import `pool` correctly
+import { nanoid } from "nanoid"; // Install nanoid: npm install nanoid
 
 const PostgresSessionStore = connectPg(session);
 
@@ -14,7 +15,7 @@ export interface IStorage {
   updateUserWallet(userId: number, amount: number): Promise<User>;
   getTransactionsByEmployee(employeeId: number): Promise<Transaction[]>;
   getTransactionsByVendor(vendorId: number): Promise<Transaction[]>;
-  createTransaction(transaction: Omit<Transaction, "id">): Promise<Transaction>;
+  createTransaction(transaction: Omit<Transaction, "id" | "transactionId">): Promise<Transaction>;
   sessionStore: session.Store;
 }
 
@@ -23,7 +24,7 @@ export class DatabaseStorage implements IStorage {
 
   constructor() {
     this.sessionStore = new PostgresSessionStore({
-      pool, // Ensure the pool is used correctly
+      pool,
       createTableIfMissing: true,
     });
   }
@@ -34,12 +35,9 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(transactions)
       .where(
-        or(
-          eq(transactions.employeeId, userId),
-          eq(transactions.vendorId, userId),
-        ),
+        or(eq(transactions.employeeId, userId), eq(transactions.vendorId, userId))
       )
-      .orderBy(desc(transactions.timestamp)); // Ensure ordering is correct
+      .orderBy(desc(transactions.timestamp));
   }
 
   // Get all users
@@ -51,16 +49,13 @@ export class DatabaseStorage implements IStorage {
     return await db
       .select()
       .from(transactions)
-      .where(
-        eq(transactions.amount, transactions.amount)  // Always true, just to use where clause
-      )
       .orderBy(desc(transactions.timestamp));
   }
 
   // Get a user by ID
   async getUser(id: number): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user; // It’s safe to return `undefined` if the user doesn’t exist
+    return user;
   }
 
   // Get a user by username
@@ -89,7 +84,7 @@ export class DatabaseStorage implements IStorage {
 
     const [updatedUser] = await db
       .update(users)
-      .set({ walletBalance: newBalance.toString() }) // Store wallet balance as string
+      .set({ walletBalance: newBalance.toString() })
       .where(eq(users.id, userId))
       .returning();
 
@@ -102,7 +97,7 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(transactions)
       .where(eq(transactions.employeeId, employeeId))
-      .orderBy(desc(transactions.timestamp)); // Ensure ordering is correct
+      .orderBy(desc(transactions.timestamp));
   }
 
   // Get transactions by vendor
@@ -111,15 +106,18 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(transactions)
       .where(eq(transactions.vendorId, vendorId))
-      .orderBy(desc(transactions.timestamp)); // Ensure correct column is used
+      .orderBy(desc(transactions.timestamp));
   }
 
   // Create a new transaction
-  async createTransaction(transaction: Omit<Transaction, "id">): Promise<Transaction> {
+  async createTransaction(transaction: Omit<Transaction, "id" | "transactionId">): Promise<Transaction> {
+    const transactionId = `TXN${Date.now()}${nanoid(6)}`; // Generate a unique transaction ID
+
     const [newTransaction] = await db
       .insert(transactions)
-      .values({ ...transaction, timestamp: new Date() }) // Store current timestamp
+      .values({ ...transaction, transactionId, timestamp: new Date() }) // Store unique transaction ID
       .returning();
+    
     return newTransaction;
   }
 }
